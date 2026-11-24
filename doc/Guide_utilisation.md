@@ -65,10 +65,9 @@ Pour passer une affaire à un collègue : il restaure votre sauvegarde sur sa ta
 
 L'appli doit être publiée sur une adresse **HTTPS** pour être installable et fonctionner hors ligne. Seul le code est publié : les données de chantier ne quittent jamais la tablette.
 
-**À décider avec l'informatique de NRGYS :**
+**Adresse de l'appli : https://bph-nrgys.github.io/suivi-chantier/**
 
-- **Option A — Azure Static Web Apps** (offre gratuite) : dans l'environnement Microsoft de NRGYS. C'est mon option recommandée.
-- **Option B — GitHub Pages** (gratuit) : plus simple, mais le code est public. Aucune donnée client n'y figure.
+L'appli est publiée sur **GitHub Pages** (gratuit), depuis le dépôt https://github.com/BPH-NRGYS/suivi-chantier. Le code y est public ; aucune donnée client n'y figure. Chaque envoi de code sur la branche `main` remet l'appli en ligne en une à deux minutes.
 
 Une fois l'appli publiée, sur chaque tablette :
 
@@ -86,7 +85,7 @@ Une fois l'appli publiée, sur chaque tablette :
 | Liste des lots | Libre (saisie par intervenant) | **À fournir :** liste standard des lots et codes, si elle existe |
 | Mention en fin de CR | Vide par défaut, réglable | **À fournir :** texte type, par exemple le délai de contestation du CR |
 | Tests sur tablette réelle | Testé sur PC, dans un navigateur au format tablette, et hors ligne dans Edge | **À tester :** appareil photo, dictée et impression PDF sur la tablette Android de l'équipe |
-| Hébergement | Non publié | **Décision :** Azure ou GitHub (voir § 5) |
+| Hébergement | Publié sur GitHub Pages (voir § 5) | Passage sur Azure possible plus tard, si l'informatique le demande |
 | Synchronisation entre tablettes | Non prévue (sauvegarde manuelle) | Version 2 possible (SharePoint ou OneDrive) |
 | Diagnostic de l'existant | Hors périmètre v0.1 | Version 2 : relevé des équipements |
 | Plans | Non gérés | Version 2 possible : placer les observations sur un plan PDF |
