@@ -72,7 +72,7 @@ const ExportXlsx = (() => {
 
   function base(o, data) {
     const i = Model.intervenant(data.affaire, o.intervenantId);
-    return [o.numero, i?.lot || '', i?.societe || (i ? '' : 'Généralités'), o.localisation, o.description, o.priorite === 'urgente' ? 'Urgent' : '', fmtDate(o.echeance)];
+    return [o.numero, i?.lot || '', i?.societe || (i ? '' : 'Généralités'), o.localisation, Model.nomPlan(data, o), o.description, o.priorite === 'urgente' ? 'Urgent' : '', fmtDate(o.echeance)];
   }
 
   // Observations figurant au CR d'une visite, avec leur statut à cette visite.
@@ -84,8 +84,8 @@ const ExportXlsx = (() => {
       }
     }
     return workbook(`Visite ${v.numero}`,
-      ['N°', 'Lot', 'Entreprise', 'Localisation', 'Observation', 'Priorité', 'Échéance', 'Émise', 'Statut', 'Commentaire de suivi', 'Photos'],
-      rows, [6, 12, 22, 20, 60, 9, 11, 8, 10, 40, 8]);
+      ['N°', 'Lot', 'Entreprise', 'Localisation', 'Plan', 'Observation', 'Priorité', 'Échéance', 'Émise', 'Statut', 'Commentaire de suivi', 'Photos'],
+      rows, [6, 12, 22, 20, 18, 60, 9, 11, 8, 10, 40, 8]);
   }
 
   // Toutes les observations d'une affaire, avec leur situation actuelle.
@@ -97,8 +97,8 @@ const ExportXlsx = (() => {
         g.levee ? 'Levée' : 'En cours', g.levee ? `V${g.levee.numero} – ${fmtDate(g.levee.date)}` : '', g.dernierCommentaire, (o.photos || []).length];
     });
     return workbook('Registre',
-      ['N°', 'Lot', 'Entreprise', 'Localisation', 'Observation', 'Priorité', 'Échéance', 'Émise', 'Statut', 'Levée', 'Dernier commentaire', 'Photos'],
-      rows, [6, 12, 22, 20, 60, 9, 11, 16, 10, 16, 40, 8]);
+      ['N°', 'Lot', 'Entreprise', 'Localisation', 'Plan', 'Observation', 'Priorité', 'Échéance', 'Émise', 'Statut', 'Levée', 'Dernier commentaire', 'Photos'],
+      rows, [6, 12, 22, 20, 18, 60, 9, 11, 16, 10, 16, 40, 8]);
   }
 
   return { visite, registre };

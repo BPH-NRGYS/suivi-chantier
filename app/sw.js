@@ -1,12 +1,13 @@
 // Mise en cache de l'application pour un fonctionnement sans réseau.
 // Changer VERSION à chaque mise à jour du code pour forcer le rafraîchissement.
-const VERSION = 'v1';
+const VERSION = 'v2';
 const CACHE = 'suivi-chantier-' + VERSION;
 const FILES = [
   './', 'index.html', 'manifest.webmanifest', 'css/app.css',
   'img/logo.jpg', 'img/icon-192.png', 'img/icon-512.png',
-  'js/db.js', 'js/zip.js', 'js/model.js', 'js/annot.js', 'js/export-pdf.js',
+  'js/db.js', 'js/zip.js', 'js/model.js', 'js/annot.js', 'js/plans.js', 'js/export-pdf.js',
   'js/export-docx.js', 'js/export-xlsx.js', 'js/backup.js', 'js/app.js',
+  'lib/pdfjs/pdf.min.mjs', 'lib/pdfjs/pdf.worker.min.mjs',
 ];
 
 self.addEventListener('install', (e) => {

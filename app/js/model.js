@@ -82,7 +82,23 @@ const Model = {
     const visites = (await DB.byAffaire('visites', affaireId)).sort((a, b) => a.numero - b.numero);
     const observations = (await DB.byAffaire('observations', affaireId)).sort((a, b) => a.numero - b.numero);
     const visitesById = Object.fromEntries(visites.map((v) => [v.id, v]));
-    return { affaire, visites, observations, visitesById };
+    const plans = (await DB.byAffaire('plans', affaireId)).sort((a, b) => (a.ordre || 0) - (b.ordre || 0));
+    const plansById = Object.fromEntries(plans.map((p) => [p.id, p]));
+    return { affaire, visites, observations, visitesById, plans, plansById };
+  },
+
+  // Nom du plan où l'observation est repérée ('' si aucun).
+  nomPlan(data, o) {
+    return (o.plan && data.plansById[o.plan.planId]?.nom) || '';
+  },
+
+  // Puces d'un plan pour une visite : observations de ce CR repérées sur ce plan.
+  pinsPlan(data, visite, planId) {
+    return data.observations
+      .filter((o) => o.plan && o.plan.planId === planId)
+      .map((o) => ({ o, etat: Model.etat(o, visite, data.visitesById) }))
+      .filter((l) => l.etat)
+      .map(({ o, etat }) => ({ id: o.id, x: o.plan.x, y: o.plan.y, label: o.numero, code: etat.code }));
   },
 
   intervenant(affaire, id) {
@@ -170,7 +186,7 @@ const Model = {
     return v;
   },
 
-  async nouvelleObservation(data, visite) {
+  async nouvelleObservation(data, visite, plan = null) {
     const num = data.observations.reduce((m, o) => Math.max(m, o.numero), 0) + 1;
     const o = {
       id: U.uid(),
@@ -183,6 +199,7 @@ const Model = {
       priorite: 'normale',
       echeance: '',
       photos: [],
+      plan, // {planId, x, y} : position relative (0 à 1) sur le plan, ou null
       suivis: {},
       createdAt: new Date().toISOString(),
     };
@@ -200,6 +217,7 @@ const Model = {
     if (!data) return;
     for (const o of data.observations) await Model.supprimerObservation(o);
     for (const v of data.visites) await DB.del('visites', v.id);
+    for (const p of data.plans) await DB.del('plans', p.id);
     await DB.del('affaires', affaireId);
   },
 

@@ -28,7 +28,7 @@ const ExportPDF = (() => {
         const crea = data.visitesById[o.visiteId];
         obs += `<tr class="${etat.code === 'levee' ? 'levee' : ''}">
           <td class="c"><strong>${o.numero}</strong><div class="small">V${crea.numero}</div></td>
-          <td>${esc(o.localisation)}</td>
+          <td>${esc(o.localisation)}${Model.nomPlan(data, o) ? `<div class="small">Plan : ${esc(Model.nomPlan(data, o))}</div>` : ''}</td>
           <td>${o.priorite === 'urgente' ? '<strong class="urg">URGENT – </strong>' : ''}${esc(o.description).replace(/\n/g, '<br>')}
             ${etat.commentaire ? `<div class="suivi">Suivi V${visite.numero} : ${esc(etat.commentaire).replace(/\n/g, '<br>')}</div>` : ''}</td>
           <td class="c">${fmtDate(o.echeance)}</td>
@@ -41,6 +41,8 @@ const ExportPDF = (() => {
         if (photos.length && etat.code !== 'levee') obs += `<tr class="ph"><td></td><td colspan="4"><div class="figs">${photos.join('')}</div></td></tr>`;
       }
     }
+
+    const plans = await Plans.pourCR(data, visite);
 
     const prochaine = visite.prochaineDate
       ? `Prochaine visite le <strong>${fmtDate(visite.prochaineDate)}${visite.prochaineHeure ? ' à ' + visite.prochaineHeure.replace(':', 'h') : ''}</strong>.` : '';
@@ -70,7 +72,11 @@ const ExportPDF = (() => {
         ${obs ? `<table class="t tobs"><thead><tr><th style="width:7%">N°</th><th style="width:17%">Localisation</th><th>Observation</th><th style="width:11%">Échéance</th><th style="width:10%">Statut</th></tr></thead><tbody>${obs}</tbody></table>
           <p class="small">V<em>n</em> : visite où l'observation a été émise. Les observations levées n'apparaîtront plus au prochain CR.</p>` : '<p>Aucune observation.</p>'}
 
-        <h1>4. Remarques générales</h1>
+        ${plans.length ? `<h1 class="saut">4. Plans de repérage</h1>
+          ${plans.map(({ plan, image }) => `<figure class="plan"><figcaption>${esc(plan.nom)}</figcaption><img src="${u(image.blob)}"></figure>`).join('')}
+          <p class="small">Les puces portent le numéro de l'observation. Bleu : nouvelle ; orange : en cours ; vert : levée.</p>` : ''}
+
+        <h1>${plans.length ? 5 : 4}. Remarques générales</h1>
         <p>${esc(visite.remarques).replace(/\n/g, '<br>') || '—'}</p>
         ${prochaine ? `<p class="next">${prochaine}</p>` : ''}
         ${mention ? `<p class="mention">${esc(mention).replace(/\n/g, '<br>')}</p>` : ''}

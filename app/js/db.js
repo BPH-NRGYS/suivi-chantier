@@ -1,8 +1,8 @@
 // Stockage local (IndexedDB) — les données restent sur la tablette.
 const DB = (() => {
   const NAME = 'suivi-chantier';
-  const VERSION = 1;
-  const STORES = ['affaires', 'visites', 'observations', 'photos', 'meta'];
+  const VERSION = 2;
+  const STORES = ['affaires', 'visites', 'observations', 'photos', 'plans', 'meta'];
   let dbp = null;
 
   function open() {
@@ -20,6 +20,10 @@ const DB = (() => {
         }
         if (!db.objectStoreNames.contains('photos')) db.createObjectStore('photos', { keyPath: 'id' });
         if (!db.objectStoreNames.contains('meta')) db.createObjectStore('meta', { keyPath: 'id' });
+        // Version 2 : fonds de plans
+        if (!db.objectStoreNames.contains('plans')) {
+          db.createObjectStore('plans', { keyPath: 'id' }).createIndex('affaireId', 'affaireId');
+        }
       };
       req.onsuccess = () => resolve(req.result);
       req.onerror = () => reject(req.error);

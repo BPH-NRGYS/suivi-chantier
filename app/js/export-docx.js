@@ -160,7 +160,8 @@ const ExportDocx = (() => {
           const stColor = { nouvelle: C.indigo, encours: 'C05600', levee: C.vert }[etat.code];
           rows.push(tr([
             cell([para(run(String(o.numero), { bold: true }), { align: 'center' }), para(run(`V${crea.numero}`, { size: 8, color: C.levee }), { align: 'center' })], w[0]),
-            cell(o.localisation, w[1], { color: col }),
+            cell([o.localisation ? para(run(o.localisation, { color: col })) : '',
+              Model.nomPlan(data, o) ? para(run(`Plan : ${Model.nomPlan(data, o)}`, { size: 8, color: C.levee })) : ''], w[1]),
             cell(desc, w[2]),
             cell(fmtDate(o.echeance), w[3], { align: 'center' }),
             cell(Model.STATUTS[etat.code], w[4], { align: 'center', bold: true, color: stColor }),
@@ -189,8 +190,22 @@ const ExportDocx = (() => {
       body.push(para(run('Vn : visite où l\'observation a été émise. Les observations levées n\'apparaîtront plus au prochain CR.', { size: 8, italic: true, color: C.levee }), { before: 60 }));
     } else body.push(para('Aucune observation.'));
 
-    // 4. Remarques
-    h1('4. Remarques générales');
+    // 4. Plans de repérage (chaque plan sur sa page)
+    const plans = await Plans.pourCR(data, visite);
+    if (plans.length) {
+      body.push('<w:p><w:r><w:br w:type="page"/></w:r></w:p>');
+      h1('4. Plans de repérage');
+      for (const [i, { plan, image: im }] of plans.entries()) {
+        const [wc, hc] = imgSize(im.w, im.h, 17, 22);
+        const rid = await addMedia(im.blob);
+        body.push(para(run(plan.nom, { font: FONT_T, size: 11, color: C.ultra }), { keep: true, before: i ? 240 : 0, after: 60 }));
+        body.push(para([image(rid, imgN++, wc, hc)], { align: 'center' }));
+      }
+      body.push(para(run('Les puces portent le numéro de l\'observation. Bleu : nouvelle ; orange : en cours ; vert : levée.', { size: 8, italic: true, color: C.levee }), { before: 60 }));
+    }
+
+    // Remarques
+    h1(`${plans.length ? 5 : 4}. Remarques générales`);
     body.push(para(visite.remarques || '—'));
     if (visite.prochaineDate) {
       body.push(para([run('Prochaine visite le ', {}), run(`${fmtDate(visite.prochaineDate)}${visite.prochaineHeure ? ' à ' + visite.prochaineHeure.replace(':', 'h') : ''}`, { bold: true, color: C.ultra }), run('.')], { before: 200 }));

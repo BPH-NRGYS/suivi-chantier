@@ -119,6 +119,47 @@ input:focus, select:focus, textarea:focus { outline: 2px solid var(--indigo); bo
 .annot-stage { flex: 1; display: flex; align-items: center; justify-content: center; overflow: hidden; padding: 8px; }
 .annot canvas { touch-action: none; }
 
+/* Plans : vignettes */
+.plans { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 12px; margin-bottom: 10px; }
+.plan-card { border: 1px solid var(--bord); border-radius: var(--r); overflow: hidden; display: flex; flex-direction: column; background: #fff; text-decoration: none; color: inherit; }
+.plan-card img { width: 100%; height: 160px; object-fit: contain; background: #fff; border-bottom: 1px solid var(--bord); }
+.plan-card input { border: none; border-radius: 0; }
+.plan-card .plan-nom { padding: 8px 12px 0; font-weight: 600; color: var(--ultra); }
+.plan-card > .muted { padding: 0 12px 10px; }
+.plan-btns { display: flex; align-items: center; gap: 4px; border-top: 1px solid var(--bord); padding-left: 10px; }
+.plan-btns .muted { flex: 1; font-size: 14px; }
+.plan-btns button { border: none; border-left: 1px solid var(--bord); border-radius: 0; }
+canvas.extrait { width: 100%; max-width: 720px; height: auto; border: 1px solid var(--bord); border-radius: var(--r); cursor: pointer; display: block; margin-bottom: 6px; }
+
+/* Plans : visionneuse plein écran */
+.pv { position: fixed; left: 0; right: 0; bottom: 0; top: 63px; z-index: 8; display: flex; flex-direction: column; background: #5A5E6B; }
+.pv-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 8px 12px; background: #fff; border-bottom: 1px solid var(--bord); }
+.pv-bar select { width: auto; max-width: 320px; }
+.pv-nom { color: var(--ultra); }
+.pv-hint { flex: 1; min-width: 200px; font-size: 15px; color: var(--muted); display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.pv-mode { color: #fff; background: var(--orange); padding: 6px 12px; border-radius: 8px; font-weight: 600; }
+.pv-zoom { display: flex; gap: 4px; }
+.pv-zoom button { min-width: 50px; font-size: 20px; }
+.pv-zoom button[data-z="fit"] { font-size: 15px; }
+.pv-host { flex: 1; position: relative; }
+.pv-stage { overflow: hidden; touch-action: none; user-select: none; -webkit-user-select: none; }
+.pv-layer { position: absolute; left: 0; top: 0; transform-origin: 0 0; will-change: transform; }
+.pv-img { display: block; max-width: none; background: #fff; pointer-events: none; -webkit-user-drag: none; }
+.pv-pins { position: absolute; inset: 0; --inv: 1; }
+.pv-pin { position: absolute; transform: translate(-50%, -50%) scale(var(--inv)); width: 36px; height: 36px; min-height: 0; padding: 0; border-radius: 50%;
+  border: 3px solid #fff; color: #fff; font-weight: 700; font-size: 15px; box-shadow: 0 1px 4px rgba(0, 0, 0, .5); }
+.pv-pin.c-nouvelle { background: #0040D1; }
+.pv-pin.c-encours { background: #E06A00; }
+.pv-pin.c-levee { background: #2EB04D; opacity: .75; }
+.pv-pin.c-temp { background: var(--rouge); }
+.pv-pin.sel { outline: 4px solid #FFD400; outline-offset: 1px; z-index: 2; }
+.pv-legend { position: absolute; left: 10px; bottom: 10px; background: rgba(255, 255, 255, .92); border-radius: 8px; padding: 4px 10px; font-size: 14px; pointer-events: none; }
+.pv-legend .c-nouvelle { color: #0040D1; } .pv-legend .c-encours { color: #E06A00; } .pv-legend .c-levee { color: #2EB04D; }
+.pv-pop { position: absolute; left: 50%; transform: translateX(-50%); bottom: 16px; width: min(560px, calc(100% - 24px)); background: #fff; border-radius: var(--r);
+  padding: 12px 14px; box-shadow: 0 6px 24px rgba(0, 0, 0, .35); z-index: 3; }
+.pv:has(.pv-pop:not([hidden])) .pv-legend { display: none; }
+.pv-desc { white-space: pre-wrap; max-height: 7.5em; overflow: auto; margin: 4px 0; }
+
 @media (max-width: 760px) {
   .grid2 { grid-template-columns: 1fr; }
   .interv { grid-template-columns: 1fr 1fr; }
@@ -165,4 +206,8 @@ input:focus, select:focus, textarea:focus { outline: 2px solid var(--indigo); bo
   .cr figcaption { font-size: 8pt; font-style: italic; text-align: center; }
   .cr .next { margin-top: 10px; }
   .cr .mention { font-size: 8pt; font-style: italic; margin-top: 14px; }
+  .cr h1.saut { break-before: page; }
+  .cr figure.plan { width: auto; margin: 0 0 5mm; break-inside: avoid; }
+  .cr figure.plan img { width: 100%; max-width: none; max-height: 230mm; object-fit: contain; border: .5pt solid #BFBFBF; }
+  .cr figure.plan figcaption { font-family: "Franklin Gothic Medium", Arial, sans-serif; color: #0A1A70; font-size: 11pt; font-style: normal; text-align: left; margin-bottom: 2mm; }
 }

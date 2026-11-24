@@ -5,6 +5,7 @@
   let objectUrls = []; // URL des photos affichées à l'écran courant
   let nextUrls = [];   // URL créées pour l'écran en préparation
   let pendingCleanup = null; // observation vide à supprimer en quittant sa fiche
+  let planViewer = null;     // visionneuse de plan affichée
 
   // ---------- Outils d'affichage ----------
   function toast(msg, ms = 2200) {
@@ -22,6 +23,7 @@
   }
 
   function mount(html, title, backTo) {
+    if (planViewer) { planViewer.destroy(); planViewer = null; }
     objectUrls.forEach((u) => URL.revokeObjectURL(u));
     objectUrls = nextUrls;
     nextUrls = [];
@@ -109,7 +111,7 @@
       <div class="cards">${cards.join('') || '<p class="empty">Aucune affaire. Créez-en une pour commencer.</p>'}</div>
       <div class="section">
         <h2>Sauvegarde</h2>
-        <p class="muted">Sauvegarde complète (affaires, visites, photos) dans un fichier à ranger sur OneDrive.
+        <p class="muted">Sauvegarde complète (affaires, visites, photos, plans) dans un fichier à ranger sur OneDrive.
         ${lastBackup ? `Dernière sauvegarde : ${fmtDate(lastBackup)}.` : ''}</p>
         <div class="actions">
           <button data-act="backup">Sauvegarder</button>
@@ -138,7 +140,7 @@
         if (!confirm('Restaurer ce fichier ? Les éléments de la sauvegarde remplaceront ceux de même identifiant sur la tablette ; les autres sont conservés.')) return;
         try {
           const n = await Backup.importFile(e.target.files[0]);
-          toast(`Restauration terminée : ${n.affaires} affaire(s), ${n.photos} photo(s).`, 4000);
+          toast(`Restauration terminée : ${n.affaires} affaire(s), ${n.photos} photo(s), ${n.plans} plan(s).`, 4000);
           viewHome();
         } catch (err) {
           alert('Fichier illisible : ' + err.message);
@@ -162,7 +164,7 @@
         <label class="field"><span>Rédacteur par défaut des CR</span><input data-meta="redacteur" value="${esc(redacteur)}" placeholder="Prénom NOM"></label>
         <label class="field"><span>Mention en fin de CR</span><textarea data-meta="mentionCR" rows="4" placeholder="Texte ajouté à la fin de chaque CR (facultatif)">${esc(mention)}</textarea></label>
         <p class="muted">${usage}</p>
-        <p class="muted">Version de l'application : 0.1 (prototype)</p>
+        <p class="muted">Version de l'application : 0.2 (prototype)</p>
       </div>`, 'Réglages', '#/');
     root.addEventListener('change', async (e) => {
       if (e.target.dataset.meta) { await DB.setMeta(e.target.dataset.meta, e.target.value); toast('Enregistré'); }
@@ -173,8 +175,21 @@
   async function viewAffaire(id) {
     const data = await Model.loadAffaire(id);
     if (!data) return (location.hash = '#/');
-    const { affaire, visites, observations, visitesById } = data;
+    const { affaire, visites, observations, visitesById, plans } = data;
     affaire.intervenants = affaire.intervenants || [];
+
+    const plansHtml = plans.map((p, n) => {
+      const nb = observations.filter((o) => o.plan?.planId === p.id).length;
+      return `<div class="plan-card" data-plan="${p.id}">
+        <img src="${url(p.blob)}" alt="">
+        <input data-plan-nom value="${esc(p.nom)}" placeholder="Nom du plan">
+        <div class="plan-btns">
+          <span class="muted">${nb} observation(s)</span>
+          <button data-act="up-plan" title="Monter" ${n === 0 ? 'disabled' : ''}>↑</button>
+          <button data-act="del-plan" class="danger-text">Supprimer</button>
+        </div>
+      </div>`;
+    }).join('');
 
     const rows = affaire.intervenants.map((i, n) => `
       <div class="interv" data-i="${n}">
@@ -214,6 +229,12 @@
         <div class="cards">${vis || '<p class="empty">Aucune visite.</p>'}</div>
       </div>
       <div class="section">
+        <h2>Plans</h2>
+        <p class="muted">Fonds de plans pour repérer les observations par des puces numérotées. Un PDF de plusieurs pages donne un plan par page.</p>
+        <div class="plans">${plansHtml || '<p class="empty">Aucun plan.</p>'}</div>
+        <div class="actions"><label class="btn">+ Ajouter des plans (PDF ou image)<input type="file" accept="application/pdf,.pdf,image/*" multiple data-act="add-plan" hidden></label></div>
+      </div>
+      <div class="section">
         <h2>Intervenants</h2>
         <p class="muted">L'ordre de cette liste donne l'ordre des lots dans les CR.</p>
         <div class="interv-list">${rows || '<p class="empty">Aucun intervenant.</p>'}</div>
@@ -232,6 +253,28 @@
     bindForm(root, affaire, 'affaires', (el) => { if (el.dataset.f === 'nom') $('#topbar-title').textContent = el.value; });
 
     root.addEventListener('change', async (e) => {
+      const el = e.target;
+      if (el.dataset.planNom !== undefined) {
+        const p = plans.find((x) => x.id === el.closest('.plan-card').dataset.plan);
+        p.nom = el.value.trim() || p.nom;
+        await DB.put('plans', p);
+        return;
+      }
+      if (el.dataset.act === 'add-plan' && el.files.length) {
+        const files = [...el.files];
+        let n = 0;
+        try {
+          for (const f of files) {
+            const crees = await Plans.importer(f, affaire.id, (i, tot) => toast(`Import de « ${f.name} »${tot > 1 ? ` : page ${i} / ${tot}` : ''}…`, 60000));
+            n += crees.length;
+          }
+          toast(`${n} plan(s) ajouté(s).`);
+        } catch (err) {
+          console.error(err);
+          alert('Import impossible : ' + err.message);
+        }
+        return viewAffaire(id);
+      }
       const row = e.target.closest('.interv');
       if (!row || !e.target.dataset.k) return;
       affaire.intervenants[row.dataset.i][e.target.dataset.k] = e.target.value;
@@ -265,6 +308,22 @@
         await DB.put('affaires', affaire);
         viewAffaire(id);
       }
+      const pcard = btn.closest('.plan-card');
+      if (act === 'del-plan') {
+        const p = plans.find((x) => x.id === pcard.dataset.plan);
+        const lies = observations.filter((o) => o.plan?.planId === p.id);
+        if (!confirm(`Supprimer le plan « ${p.nom} » ?${lies.length ? ` ${lies.length} observation(s) y sont repérées : elles sont conservées mais perdent leur puce.` : ''}`)) return;
+        for (const o of lies) { o.plan = null; await DB.put('observations', o); }
+        await DB.del('plans', p.id);
+        return viewAffaire(id);
+      }
+      if (act === 'up-plan') {
+        const n = plans.findIndex((x) => x.id === pcard.dataset.plan);
+        plans.forEach((p, i) => (p.ordre = i + 1));
+        [plans[n - 1].ordre, plans[n].ordre] = [plans[n].ordre, plans[n - 1].ordre];
+        for (const p of plans) await DB.put('plans', p);
+        return viewAffaire(id);
+      }
       if (act === 'new-visite') {
         const v = await Model.nouvelleVisite(data);
         location.hash = '#/visite/' + v.id;
@@ -283,7 +342,7 @@
   }
 
   // ---------- Visite ----------
-  const TABS = [['general', 'Général'], ['presences', 'Présences'], ['avancement', 'Avancement'], ['obs', 'Observations'], ['cr', 'CR / Exports']];
+  const TABS = [['general', 'Général'], ['presences', 'Présences'], ['avancement', 'Avancement'], ['obs', 'Observations'], ['plans', 'Plans'], ['cr', 'CR / Exports']];
 
   async function viewVisite(id) {
     const visite = await DB.get('visites', id);
@@ -350,7 +409,8 @@
           cards.push(`<div class="obs ${etat.code === 'levee' ? 'is-levee' : ''}" data-id="${o.id}">
             <a class="obs-main" href="#/obs/${o.id}/${visite.id}">
               <div class="obs-head"><span class="num">${o.numero}</span>${badge(etat.code)}${o.priorite === 'urgente' ? '<span class="badge b-urgent">Urgent</span>' : ''}
-                <span class="muted">${esc(o.localisation)}</span>${o.echeance ? `<span class="muted">· échéance ${fmtDate(o.echeance)}</span>` : ''}</div>
+                <span class="muted">${esc(o.localisation)}</span>${o.echeance ? `<span class="muted">· échéance ${fmtDate(o.echeance)}</span>` : ''}
+                ${o.plan && data.plansById[o.plan.planId] ? `<span class="muted">· 📍 ${esc(Model.nomPlan(data, o))}</span>` : ''}</div>
               <div class="obs-desc">${esc(o.description) || '<em class="muted">(sans description)</em>'}</div>
               ${etat.commentaire ? `<div class="obs-suivi">Suivi : ${esc(etat.commentaire)}</div>` : ''}
               ${thumbs.length ? `<div class="thumbs">${thumbs.join('')}</div>` : ''}
@@ -366,6 +426,18 @@
         </div>
         <div class="obs-list">${cards.join('') || '<p class="empty">Aucune observation.</p>'}</div>
         <button class="fab" data-act="new-obs">+ Observation</button>`;
+    } else if (tab === 'plans') {
+      body = data.plans.length ? `
+        <p class="muted">Ouvrez un plan, puis touchez-le à l'endroit voulu pour créer une observation. Les puces portent le numéro de l'observation.</p>
+        <div class="plans">${data.plans.map((p) => {
+          const pins = Model.pinsPlan(data, visite, p.id);
+          const ouv = pins.filter((x) => x.code !== 'levee').length;
+          return `<a class="plan-card" href="#/plan/${p.id}/${visite.id}">
+            <img src="${url(p.blob)}" alt="">
+            <div class="plan-nom">${esc(p.nom)}</div>
+            <div class="muted">${pins.length} puce(s) · ${ouv} non levée(s)</div></a>`;
+        }).join('')}</div>`
+        : `<p class="empty">Aucun plan. <a href="#/affaire/${affaire.id}">Ajoutez des plans sur la fiche affaire</a> (PDF ou image).</p>`;
     } else if (tab === 'cr') {
       const share = U.canShareFiles();
       body = `
@@ -459,6 +531,7 @@
     const estNouvelle = o.visiteId === visite.id;
     const suivi = (o.suivis || {})[visite.id] || {};
     pendingCleanup = estNouvelle ? o.id : null;
+    const planObs = o.plan ? data.plansById[o.plan.planId] : null;
 
     const locs = [...new Set(observations.map((x) => x.localisation).filter(Boolean))].sort();
     const photos = [];
@@ -487,6 +560,22 @@
         <datalist id="locs">${locs.map((l) => `<option value="${esc(l)}">`).join('')}</datalist>
         ${field('Observation', 'description', o.description, { rows: 5, placeholder: 'Constat, demande à l\'entreprise… (micro du clavier pour dicter)' })}
         <label class="check"><input type="checkbox" data-prio ${o.priorite === 'urgente' ? 'checked' : ''}> Urgent / sécurité</label>
+      </div>
+
+      <div class="section">
+        <h2>Repérage sur plan</h2>
+        ${planObs ? `
+          <canvas class="extrait" width="720" height="300" data-act="voir-plan"></canvas>
+          <div class="muted">Plan : ${esc(planObs.nom)}</div>
+          <div class="actions">
+            <button data-act="voir-plan">Voir sur le plan</button>
+            <button data-act="placer" data-plan="${planObs.id}">Déplacer la puce</button>
+            <button data-act="retirer-plan" class="danger-text">Retirer du plan</button>
+          </div>`
+        : data.plans.length ? `
+          <p class="muted">Placer l'observation sur :</p>
+          <div class="actions">${data.plans.map((p) => `<button data-act="placer" data-plan="${p.id}">📍 ${esc(p.nom)}</button>`).join('')}</div>`
+        : `<p class="empty">Aucun plan pour cette affaire. <a href="#/affaire/${affaire.id}">Ajoutez-en sur la fiche affaire.</a></p>`}
       </div>
 
       <div class="section">
@@ -521,6 +610,9 @@
 
     bindForm(root, o, 'observations');
 
+    const cv = root.querySelector('canvas.extrait');
+    if (cv && planObs) Plans.extrait(planObs, { x: o.plan.x, y: o.plan.y, label: o.numero, code: etat.code }, cv).catch(console.error);
+
     root.addEventListener('change', async (e) => {
       const el = e.target;
       if (el.dataset.prio !== undefined) { o.priorite = el.checked ? 'urgente' : 'normale'; await DB.put('observations', o); }
@@ -554,6 +646,14 @@
       }
       const act = t.dataset.act;
       const pid = t.closest('.photo')?.dataset.pid;
+      if (act === 'placer') return (location.hash = `#/plan/${t.dataset.plan}/${visite.id}/p.${o.id}`);
+      if (act === 'voir-plan') return (location.hash = `#/plan/${o.plan.planId}/${visite.id}/f.${o.id}`);
+      if (act === 'retirer-plan') {
+        if (!confirm('Retirer la puce de cette observation du plan ?')) return;
+        o.plan = null;
+        await DB.put('observations', o);
+        return viewObs(id, visiteId);
+      }
       if (act === 'annot') {
         const p = photos.find((x) => x.id === pid);
         const res = await Annot.open(p);
@@ -576,6 +676,127 @@
     });
   }
 
+  // ---------- Plan : puces des observations ----------
+  // extra : 'p.<obsId>' = placer cette observation ; 'f.<obsId>' = centrer sur sa puce.
+  async function viewPlan(planId, visiteId, extra = '') {
+    const plan = await DB.get('plans', planId);
+    const visite = await DB.get('visites', visiteId);
+    if (!plan || !visite) return (location.hash = '#/');
+    const data = await Model.loadAffaire(plan.affaireId);
+    const [modeUrl, obsUrl] = extra ? [extra.slice(0, 1), extra.slice(2)] : ['', ''];
+    const cible = obsUrl ? data.observations.find((x) => x.id === obsUrl) : null;
+    const retour = cible ? `#/obs/${cible.id}/${visite.id}` : `#/visite/${visite.id}`;
+    let mode = cible && modeUrl === 'p' ? { type: 'place', obs: cible } : { type: 'normal' };
+    let sel = cible && modeUrl === 'f' ? cible.id : null;
+    let temp = null; // puce provisoire avant création d'une observation
+
+    const root = mount(`
+      <div class="pv">
+        <div class="pv-bar">
+          ${data.plans.length > 1 ? `<select data-plan-select>${data.plans.map((p) => `<option value="${p.id}" ${p.id === plan.id ? 'selected' : ''}>${esc(p.nom)}</option>`).join('')}</select>` : `<strong class="pv-nom">${esc(plan.nom)}</strong>`}
+          <div class="pv-hint"></div>
+          <div class="pv-zoom"><button data-z="out" aria-label="Zoom arrière">−</button><button data-z="fit">Tout voir</button><button data-z="in" aria-label="Zoom avant">+</button></div>
+        </div>
+        <div class="pv-host"></div>
+        <div class="pv-legend"><span class="c-nouvelle">●</span> Nouvelle <span class="c-encours">●</span> En cours <span class="c-levee">●</span> Levée</div>
+        <div class="pv-pop" hidden></div>
+      </div>`, `Plan — Visite n°${visite.numero}`, retour);
+
+    const pv = root.querySelector('.pv');
+    pv.style.top = $('.topbar').getBoundingClientRect().bottom + 'px';
+    const hint = root.querySelector('.pv-hint');
+    const pop = root.querySelector('.pv-pop');
+
+    function pins() {
+      const p = Model.pinsPlan(data, visite, plan.id).map((x) => ({ ...x, sel: x.id === sel }));
+      if (temp) p.push({ id: '_temp', x: temp.x, y: temp.y, label: '+', code: 'temp', sel: true });
+      return p;
+    }
+    function majHint() {
+      if (mode.type === 'place' || mode.type === 'move') {
+        hint.innerHTML = `<span class="pv-mode">Touchez l'emplacement de l'observation n°${mode.obs.numero}</span> <button data-act="annuler-mode">Annuler</button>`;
+      } else {
+        hint.textContent = 'Touchez le plan pour créer une observation, ou une puce pour la consulter.';
+      }
+    }
+    function fermerPop() { pop.hidden = true; sel = null; temp = null; planViewer.setPins(pins()); }
+
+    function ouvrirPop(o) {
+      const etat = Model.etat(o, visite, data.visitesById);
+      const i = Model.intervenant(data.affaire, o.intervenantId);
+      pop.innerHTML = `
+        <div class="obs-head"><span class="num">${o.numero}</span>${etat ? badge(etat.code) : ''}
+          <span class="muted">${esc(Model.labelIntervenant(i))}${o.localisation ? ' · ' + esc(o.localisation) : ''}</span></div>
+        <div class="pv-desc">${esc(o.description) || '<em class="muted">(sans description)</em>'}</div>
+        ${etat?.commentaire ? `<div class="obs-suivi">Suivi : ${esc(etat.commentaire)}</div>` : ''}
+        <div class="actions">
+          <a class="btn primary" href="#/obs/${o.id}/${visite.id}">Ouvrir la fiche</a>
+          <button data-act="deplacer" data-obs="${o.id}">Déplacer</button>
+          <button data-act="fermer">Fermer</button>
+        </div>`;
+      pop.hidden = false;
+    }
+
+    planViewer = Plans.viewer(root.querySelector('.pv-host'), plan, {
+      pins: pins(),
+      focus: sel && cible?.plan ? { x: cible.plan.x, y: cible.plan.y } : null,
+      async onTap(x, y) {
+        if (mode.type === 'place' || mode.type === 'move') {
+          const o = mode.obs;
+          o.plan = { planId: plan.id, x, y };
+          await DB.put('observations', o);
+          if (mode.type === 'place') return (location.hash = retour);
+          mode = { type: 'normal' };
+          sel = o.id;
+          majHint();
+          planViewer.setPins(pins());
+          ouvrirPop(o);
+          return toast('Puce déplacée');
+        }
+        sel = null;
+        temp = { x, y };
+        planViewer.setPins(pins());
+        pop.innerHTML = `<div><strong>Nouvelle observation à cet endroit ?</strong></div>
+          <div class="actions"><button class="primary" data-act="creer">Créer l'observation</button><button data-act="fermer">Annuler</button></div>`;
+        pop.hidden = false;
+      },
+      onPin(id) {
+        if (mode.type !== 'normal' || id === '_temp') return;
+        temp = null;
+        sel = id;
+        planViewer.setPins(pins());
+        ouvrirPop(data.observations.find((x) => x.id === id));
+      },
+    });
+    majHint();
+    if (sel && cible) ouvrirPop(cible);
+
+    root.addEventListener('change', (e) => {
+      if (e.target.dataset.planSelect !== undefined) location.hash = `#/plan/${e.target.value}/${visite.id}${mode.type === 'place' ? '/p.' + mode.obs.id : ''}`;
+    });
+    root.addEventListener('click', async (e) => {
+      const t = e.target.closest('button');
+      if (!t) return;
+      if (t.dataset.z) return t.dataset.z === 'fit' ? planViewer.fit() : planViewer.zoom(t.dataset.z === 'in' ? 1.6 : 1 / 1.6);
+      const act = t.dataset.act;
+      if (act === 'fermer') fermerPop();
+      if (act === 'creer') {
+        const o = await Model.nouvelleObservation(data, visite, { planId: plan.id, x: temp.x, y: temp.y });
+        location.hash = `#/obs/${o.id}/${visite.id}`;
+      }
+      if (act === 'deplacer') {
+        mode = { type: 'move', obs: data.observations.find((x) => x.id === t.dataset.obs) };
+        pop.hidden = true;
+        majHint();
+      }
+      if (act === 'annuler-mode') {
+        if (mode.type === 'place') return (location.hash = retour);
+        mode = { type: 'normal' };
+        majHint();
+      }
+    });
+  }
+
   // Supprime une observation créée puis laissée vide.
   async function cleanup() {
     if (!pendingCleanup) return;
@@ -590,8 +811,12 @@
   // ---------- Navigation ----------
   async function route() {
     const parts = (location.hash || '#/').slice(2).split('/');
-    if (!(parts[0] === 'obs' && parts[1] === pendingCleanup)) await cleanup();
+    const resteSurObs = (parts[0] === 'obs' && parts[1] === pendingCleanup)
+      || (parts[0] === 'plan' && parts[3] && parts[3].slice(2) === pendingCleanup);
+    if (!resteSurObs) await cleanup();
     try {
+      if (parts[0] === 'plan') await viewPlan(parts[1], parts[2], parts[3]);
+      else
       if (parts[0] === 'affaire') await viewAffaire(parts[1]);
       else if (parts[0] === 'visite') await viewVisite(parts[1]);
       else if (parts[0] === 'obs') await viewObs(parts[1], parts[2]);
